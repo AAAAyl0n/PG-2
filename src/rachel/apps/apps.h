@@ -35,8 +35,8 @@ void rachel_app_install_callback(MOONCAKE::Mooncake* mooncake)
     //mooncake->installApp(new MOONCAKE::APPS::AppImutest_Packer);
     mooncake->installApp(new MOONCAKE::APPS::AppAsciiart_Packer);
     //mooncake->installApp(new MOONCAKE::APPS::AppGenshin_Packer);
-    //mooncake->installApp(new MOONCAKE::APPS::AppRecorder_Packer);
-    //mooncake->installApp(new MOONCAKE::APPS::AppMusic_Packer);
+    mooncake->installApp(new MOONCAKE::APPS::AppRecorder_Packer);
+    mooncake->installApp(new MOONCAKE::APPS::AppMusic_Packer);
     mooncake->installApp(new MOONCAKE::APPS::AppPoweroff_Packer);
     
     /* Install app locator(Don't remove) */
