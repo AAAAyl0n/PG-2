@@ -97,10 +97,10 @@ void HAL_Rachel::_disp_logo()
 
 void HAL_Rachel::_sum_up()
 {
-    // Pause if btn SELECT is pressing - 使用SELECT键替代原来的A键
+    // Pause if encoder turned left (SELECT)
     if (getButton(GAMEPAD::BTN_SELECT))
     {
-        HAL_LOG_WARN("btn SELECT pressed and pause");
+        HAL_LOG_WARN("encoder SELECT pressed and pause");
         HAL_LOG_WARN("press btn start to proceed");
         while (1)
         {

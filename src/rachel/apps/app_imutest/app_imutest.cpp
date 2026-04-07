@@ -77,7 +77,7 @@ void AppImutest::onRunning()
     while (true)
     {
         // 检查按键SELECT退出
-        if (HAL::GetButton(GAMEPAD::BTN_SELECT)) {
+        if (HAL::GetButton(GAMEPAD::BTN_BACK)) {
             destroyApp();
             return;
         }

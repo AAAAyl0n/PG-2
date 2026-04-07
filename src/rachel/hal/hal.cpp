@@ -100,9 +100,10 @@ tm* HAL::getLocalTime()
 
 bool HAL::getAnyButton()
 {
-    // 只检查保留的三个按键
-    if (getButton(GAMEPAD::BTN_SELECT) || 
-        getButton(GAMEPAD::BTN_START) || 
+    if (getButton(GAMEPAD::BTN_START) ||
+        getButton(GAMEPAD::BTN_JOYSTICK) ||
+        getButton(GAMEPAD::BTN_BACK) ||
+        getButton(GAMEPAD::BTN_SELECT) ||
         getButton(GAMEPAD::BTN_RIGHT))
         return true;
     return false;

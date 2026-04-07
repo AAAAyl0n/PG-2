@@ -14,6 +14,7 @@
 #include "utils/m5unified/RTC8563_Class.hpp"
 #include "utils/m5unified/IMU_Class.hpp"
 #include "utils/m5unified/audio/M5EchoBase.h"
+#include <Adafruit_NeoPixel.h>
 
 // 添加FreeRTOS相关头文件
 #include <freertos/FreeRTOS.h>
@@ -42,7 +43,13 @@ private:
     uint8_t _audio_volume;
     bool _audio_muted;
     int _audio_sample_rate;
-    
+
+    // WS2812 LED
+    Adafruit_NeoPixel* _leds;
+
+    // MPR121 触摸
+    bool _touch_ready;
+
     // 音频播放命令结构
     struct AudioCommand_t {
         char filename[256];
@@ -80,12 +87,22 @@ private:
     void _spk_init();
     void _sdcard_init();
     void _gamepad_init();
-    void _audio_init();  // 新增音频初始化方法
+    void _audio_init();
+    void _ws2812_init();
+    void _touch_init();
     void _adjust_sys_time();
     void _calibrateRTCWithCompileTime();
     void _system_config_init();
     void _sum_up();
     
+    // 编码器状态
+    int _encoder_last_a = 0;
+    int _encoder_delta = 0;
+    bool _encoder_left_flag = false;   // 逆时针触发 → BTN_SELECT
+    bool _encoder_right_flag = false;  // 顺时针触发 → BTN_RIGHT
+    unsigned long _encoder_last_trigger_ms = 0;  // 上次触发时间(消抖用)
+    void _pollEncoder();
+
     // 日志显示控制（单行刷新模式）
     bool _log_single_line_mode = false;
     int16_t _log_single_line_x = 0;
@@ -96,11 +113,12 @@ private:
     static bool _playWavFileInTask(FS& fs, const char* filename);
 
 public:
-    HAL_Rachel() : _i2c_bus(nullptr), _rtc(nullptr), _imu(nullptr), 
-                   _echobase(nullptr), _audio_task_handle(nullptr), 
-                   _audio_queue(nullptr), _is_audio_playing(false), 
+    HAL_Rachel() : _i2c_bus(nullptr), _rtc(nullptr), _imu(nullptr),
+                   _echobase(nullptr), _audio_task_handle(nullptr),
+                   _audio_queue(nullptr), _is_audio_playing(false),
                    _should_stop_audio(false), _audio_volume(71), _audio_muted(false),
-                   _audio_sample_rate(48000)
+                   _audio_sample_rate(48000), _leds(nullptr),
+                   _touch_ready(false)
     {
     }
     ~HAL_Rachel()
@@ -119,6 +137,7 @@ public:
             _echobase = nullptr;
         }
         
+        delete _leds;
         delete _rtc;
         delete _imu;
         delete _i2c_bus;
@@ -138,6 +157,8 @@ public:
         _fs_init();
         _sdcard_init();
         _audio_init();
+        _ws2812_init();
+        _touch_init();
         _system_config_init();
         _sum_up();
     }
@@ -156,6 +177,9 @@ public:
     void loadLauncherFont24() override;
 
     bool getButton(GAMEPAD::GamePadButton_t button) override;
+    int getJoystickX() override;
+    int getJoystickY() override;
+    int getEncoderDelta() override;
     void powerOff() override;
     void setSystemTime(tm dateTime) override;
     void lightSleepWithButtonWakeup() override;
@@ -173,6 +197,20 @@ public:
     void setAudioVolume(uint8_t volume) override;
     uint8_t getAudioVolume() override;
     void setAudioMute(bool mute) override;
+
+    // WS2812 LED 接口实现
+    void setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b) override;
+    void setAllLedColor(uint8_t r, uint8_t g, uint8_t b) override;
+    void setLedOff() override;
+    void ledShow() override;
+    void setLedBrightness(uint8_t brightness) override;
+
+    // MPR121 触摸接口实现
+    uint16_t getTouchStatus() override;
+    bool isTouched(uint8_t channel) override;
+    uint16_t getTouchFiltered(uint8_t channel) override;
+    uint16_t getTouchBaseline(uint8_t channel) override;
+    bool checkTouch() override;
 
     // 录音相关（保存为原始PCM数据到SD卡）
     bool recordPcmToSd(const char* filename, int durationSeconds);

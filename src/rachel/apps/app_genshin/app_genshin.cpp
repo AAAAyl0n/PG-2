@@ -33,7 +33,7 @@ using namespace SYSTEM::UI;
 void AppGenshin::onRunning()
 {
     // 检查按键退出
-    if (HAL::GetButton(GAMEPAD::BTN_SELECT)) {
+    if (HAL::GetButton(GAMEPAD::BTN_BACK)) {
         // 退出前停止播放
         destroyApp();
     }

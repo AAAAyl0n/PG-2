@@ -18,55 +18,111 @@ void HAL_Rachel::_gamepad_init()
     spdlog::info("gamepad init");
     HAL_LOG_INFO("gamepad init");
 
-    // Map pin to button - 只保留三个按键
+    // Button pin mapping
     _gamepad_key_map[GAMEPAD::BTN_START] = HAL_PIN_GAMEPAD_START;
-    _gamepad_key_map[GAMEPAD::BTN_SELECT] = HAL_PIN_GAMEPAD_SELECT;
-    _gamepad_key_map[GAMEPAD::BTN_RIGHT] = HAL_PIN_GAMEPAD_RIGHT;
-    
-    // 注释掉不再使用的按键
-    // _gamepad_key_map[GAMEPAD::BTN_UP] = HAL_PIN_GAMEPAD_UP;
-    // _gamepad_key_map[GAMEPAD::BTN_LEFT] = HAL_PIN_GAMEPAD_LEFT;
-    // _gamepad_key_map[GAMEPAD::BTN_DOWN] = HAL_PIN_GAMEPAD_DOWN;
-    // _gamepad_key_map[GAMEPAD::BTN_X] = HAL_PIN_GAMEPAD_X;
-    // _gamepad_key_map[GAMEPAD::BTN_Y] = HAL_PIN_GAMEPAD_Y;
-    // _gamepad_key_map[GAMEPAD::BTN_A] = HAL_PIN_GAMEPAD_A;
-    // _gamepad_key_map[GAMEPAD::BTN_B] = HAL_PIN_GAMEPAD_B;
-    // _gamepad_key_map[GAMEPAD::BTN_LEFT_STICK] = HAL_PIN_GAMEPAD_LS;
+    _gamepad_key_map[GAMEPAD::BTN_JOYSTICK] = HAL_PIN_JOYSTICK_BTN;
+    _gamepad_key_map[GAMEPAD::BTN_BACK] = HAL_PIN_BTN_BACK;
 
-    // GPIO init - 只初始化保留的三个按键
+    // GPIO init - 按键
     gpio_reset_pin((gpio_num_t)HAL_PIN_GAMEPAD_START);
     pinMode(HAL_PIN_GAMEPAD_START, INPUT_PULLUP);
-    gpio_reset_pin((gpio_num_t)HAL_PIN_GAMEPAD_SELECT);
-    pinMode(HAL_PIN_GAMEPAD_SELECT, INPUT_PULLUP);
-    gpio_reset_pin((gpio_num_t)HAL_PIN_GAMEPAD_RIGHT);
-    pinMode(HAL_PIN_GAMEPAD_RIGHT, INPUT_PULLUP);
+    gpio_reset_pin((gpio_num_t)HAL_PIN_JOYSTICK_BTN);
+    pinMode(HAL_PIN_JOYSTICK_BTN, INPUT_PULLUP);
+    gpio_reset_pin((gpio_num_t)HAL_PIN_BTN_BACK);
+    pinMode(HAL_PIN_BTN_BACK, INPUT_PULLUP);
+
+    // Joystick ADC init
+    pinMode(HAL_PIN_JOYSTICK_X, INPUT);
+    pinMode(HAL_PIN_JOYSTICK_Y, INPUT);
+
+    // Encoder init
+    gpio_reset_pin((gpio_num_t)HAL_PIN_ENC_A);
+    gpio_reset_pin((gpio_num_t)HAL_PIN_ENC_B);
+    pinMode(HAL_PIN_ENC_A, INPUT_PULLUP);
+    pinMode(HAL_PIN_ENC_B, INPUT_PULLUP);
+    _encoder_last_a = digitalRead(HAL_PIN_ENC_A);
+    _encoder_delta = 0;
 
     _key_state_list.fill(false);
 }
 
+// 轮询编码器：仅在 A 下降沿检测，用 B 相判方向，带时间消抖
+#define ENC_DEBOUNCE_MS 30  // 两次触发最小间隔(ms)
+
+void HAL_Rachel::_pollEncoder()
+{
+    int a = digitalRead(HAL_PIN_ENC_A);
+    if (a != _encoder_last_a)
+    {
+        unsigned long now = millis();
+        if (a == LOW && (now - _encoder_last_trigger_ms >= ENC_DEBOUNCE_MS))
+        {
+            int b = digitalRead(HAL_PIN_ENC_B);
+            if (b == HIGH)
+                _encoder_left_flag = true;
+            else
+                _encoder_right_flag = true;
+            _encoder_last_trigger_ms = now;
+        }
+        _encoder_last_a = a;
+    }
+}
+
 bool HAL_Rachel::getButton(GAMEPAD::GamePadButton_t button)
 {
-    // return !(bool)(digitalRead(_gamepad_key_map[button]));
+    // 每次查询按键时顺带轮询编码器
+    _pollEncoder();
 
+    // 编码器虚拟按键：读后即清
+    if (button == GAMEPAD::BTN_RIGHT)
+    {
+        bool val = _encoder_right_flag;
+        _encoder_right_flag = false;
+        return val;
+    }
+    if (button == GAMEPAD::BTN_SELECT)
+    {
+        bool val = _encoder_left_flag;
+        _encoder_left_flag = false;
+        return val;
+    }
+
+    // 物理按键（START / JOYSTICK）
     if (!digitalRead(_gamepad_key_map[button]))
     {
-        // If just pressed
         if (!_key_state_list[button])
-        {
             _key_state_list[button] = true;
-            //beep(600, 20);
-            //HAL::PlayWavFile("/system_audio/Klick.wav");
-        }
-
         return true;
     }
 
-    // If just released
     if (_key_state_list[button])
-    {
         _key_state_list[button] = false;
-        //beep(800, 20);
-    }
 
     return false;
+}
+
+int HAL_Rachel::getJoystickX()
+{
+    return 4095 - analogRead(HAL_PIN_JOYSTICK_X);
+}
+
+int HAL_Rachel::getJoystickY()
+{
+    return 4095 - analogRead(HAL_PIN_JOYSTICK_Y);
+}
+
+int HAL_Rachel::getEncoderDelta()
+{
+    _pollEncoder();
+    if (_encoder_right_flag)
+    {
+        _encoder_right_flag = false;
+        return 1;
+    }
+    if (_encoder_left_flag)
+    {
+        _encoder_left_flag = false;
+        return -1;
+    }
+    return 0;
 }

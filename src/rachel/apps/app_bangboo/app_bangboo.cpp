@@ -86,12 +86,13 @@ void AppBangboo::onRunning()
     while (true)
     {
         unsigned long currentTime = HAL::Millis();
+
         if (HAL::GetAnyButton()) {
             _data.lastActivityTime = currentTime;
         }
 
-        // 检查按键SELECT退出
-        if (HAL::GetButton(GAMEPAD::BTN_SELECT)) {
+        // BOOT 键退出
+        if (HAL::GetButton(GAMEPAD::BTN_BACK)) {
             destroyApp();
             return;
         }

@@ -45,7 +45,7 @@ void AppTimeview::onRunning()
 {
     while(1){
         // 退出
-        if (HAL::GetButton(GAMEPAD::BTN_SELECT)) {
+        if (HAL::GetButton(GAMEPAD::BTN_BACK)) {
             destroyApp();
             return;
         }

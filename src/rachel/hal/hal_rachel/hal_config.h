@@ -27,18 +27,24 @@
 // Power
 #define HAL_PIN_PWR_HOLD 10
 
-// Gamepad
-// #define HAL_PIN_GAMEPAD_LS 43     // 注释掉，不再使用
-// #define HAL_PIN_GAMEPAD_UP 2      // 注释掉，不再使用
-// #define HAL_PIN_GAMEPAD_DOWN 6    // 注释掉，不再使用
-// #define HAL_PIN_GAMEPAD_LEFT 3    // 注释掉，不再使用
-#define HAL_PIN_GAMEPAD_RIGHT 0    // 新板子 RIGHT 键对应 GPIO 0
-#define HAL_PIN_GAMEPAD_START 8     // 新板子 START 键对应 GPIO 8
-#define HAL_PIN_GAMEPAD_SELECT 21    // 新板子 SELECT 键对应 GPIO 21
-// #define HAL_PIN_GAMEPAD_X 1       // 注释掉，不再使用
-// #define HAL_PIN_GAMEPAD_Y 8       // 注释掉，不再使用（原来和START重复）
-// #define HAL_PIN_GAMEPAD_A 4       // 注释掉，不再使用
-// #define HAL_PIN_GAMEPAD_B 7       // 注释掉，不再使用
+// Button
+#define HAL_PIN_GAMEPAD_START 8     // START 键 / 编码器按键 (GPIO8)
+#define HAL_PIN_BTN_BACK 0          // BOOT 键用作返回/退出 (GPIO0)
+
+// Joystick (模拟摇杆)
+#define HAL_PIN_JOYSTICK_X 4        // 摇杆 AD-X (GPIO4)
+#define HAL_PIN_JOYSTICK_Y 5        // 摇杆 AD-Y (GPIO5)
+#define HAL_PIN_JOYSTICK_BTN 7      // 摇杆按键 (GPIO7)
+
+// Rotary Encoder (旋转编码器/滚轮)
+#define HAL_PIN_ENC_A 16            // 编码器 A 相 (GPIO16)
+#define HAL_PIN_ENC_B 17            // 编码器 B 相 (GPIO17)
+
+// WS2812 LED
+#define HAL_PIN_WS2812 21           // WS2812 数据线 (GPIO21)
+
+// MIDI
+#define HAL_PIN_MIDI_TX 9           // MIDI UART TX (GPIO9)
 
 // SD card
 #define HAL_PIN_SD_CS 15

@@ -28,22 +28,16 @@
 namespace GAMEPAD
 {
     /**
-     * @brief Game pad buttons enum
+     * @brief Button enum
      *
      */
     enum GamePadButton_t
     {
         BTN_START = 0,
-        BTN_SELECT,
-        //BTN_UP,
-        //BTN_LEFT,
-        BTN_RIGHT,
-        //BTN_DOWN,
-        //BTN_X,
-        //BTN_Y,
-        //BTN_A,
-        //BTN_B,
-        //BTN_LEFT_STICK,
+        BTN_SELECT,         // 编码器逆时针(左) 虚拟按键
+        BTN_RIGHT,          // 编码器顺时针(右) 虚拟按键
+        BTN_JOYSTICK,       // 摇杆按键 (GPIO7)
+        BTN_BACK,           // BOOT 键, 返回/退出 (GPIO0)
         GAMEPAD_BUTTON_NUM,
     };
 } // namespace GAMEPAD
@@ -345,6 +339,39 @@ public:
     virtual bool getAnyButton();
 
     ///
+    /// Joystick APIs (模拟摇杆)
+    ///
+
+    /**
+     * @brief Get joystick X axis value, 获取摇杆X轴值
+     *
+     * @return int 原始ADC值 (0~4095)
+     */
+    static int GetJoystickX() { return Get()->getJoystickX(); }
+    virtual int getJoystickX() { return 2048; }
+
+    /**
+     * @brief Get joystick Y axis value, 获取摇杆Y轴值
+     *
+     * @return int 原始ADC值 (0~4095)
+     */
+    static int GetJoystickY() { return Get()->getJoystickY(); }
+    virtual int getJoystickY() { return 2048; }
+
+    ///
+    /// Encoder APIs (旋转编码器/滚轮)
+    ///
+
+    /**
+     * @brief Get encoder delta since last call, 获取编码器增量
+     * 正值=顺时针, 负值=逆时针, 0=无变化
+     *
+     * @return int 增量值
+     */
+    static int GetEncoderDelta() { return Get()->getEncoderDelta(); }
+    virtual int getEncoderDelta() { return 0; }
+
+    ///
     /// System config APIs
     ///
 
@@ -435,4 +462,82 @@ public:
      */
     static void SetAudioMute(bool mute) { Get()->setAudioMute(mute); }
     virtual void setAudioMute(bool mute) {}
+
+    ///
+    /// LED APIs (WS2812)
+    ///
+
+    /**
+     * @brief 设置单颗 LED 颜色
+     * @param index LED 索引 (0~10)
+     * @param r, g, b 颜色分量 (0~255)
+     */
+    static void SetLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b) { Get()->setLedColor(index, r, g, b); }
+    virtual void setLedColor(uint8_t index, uint8_t r, uint8_t g, uint8_t b) {}
+
+    /**
+     * @brief 设置所有 LED 为同一颜色
+     */
+    static void SetAllLedColor(uint8_t r, uint8_t g, uint8_t b) { Get()->setAllLedColor(r, g, b); }
+    virtual void setAllLedColor(uint8_t r, uint8_t g, uint8_t b) {}
+
+    /**
+     * @brief 关闭所有 LED
+     */
+    static void SetLedOff() { Get()->setLedOff(); }
+    virtual void setLedOff() {}
+
+    /**
+     * @brief 推送 LED 数据（调用 setLedColor 后需要 show）
+     */
+    static void LedShow() { Get()->ledShow(); }
+    virtual void ledShow() {}
+
+    /**
+     * @brief 设置 LED 全局亮度 (0~255)
+     */
+    static void SetLedBrightness(uint8_t brightness) { Get()->setLedBrightness(brightness); }
+    virtual void setLedBrightness(uint8_t brightness) {}
+
+    ///
+    /// Touch APIs (MPR121)
+    ///
+
+    /**
+     * @brief 获取 12 通道触摸状态位掩码
+     * bit0=ELE0, bit1=ELE1, ... bit11=ELE11, 1=touched
+     *
+     * @return uint16_t 触摸状态
+     */
+    static uint16_t GetTouchStatus() { return Get()->getTouchStatus(); }
+    virtual uint16_t getTouchStatus() { return 0; }
+
+    /**
+     * @brief 检查指定通道是否被触摸
+     * @param channel 通道号 (0~11)
+     */
+    static bool IsTouched(uint8_t channel) { return Get()->isTouched(channel); }
+    virtual bool isTouched(uint8_t channel) { return false; }
+
+    /**
+     * @brief 获取指定通道的原始滤波值（可用于压力感应）
+     * @param channel 通道号 (0~11)
+     * @return uint16_t 滤波后的 ADC 值
+     */
+    static uint16_t GetTouchFiltered(uint8_t channel) { return Get()->getTouchFiltered(channel); }
+    virtual uint16_t getTouchFiltered(uint8_t channel) { return 0; }
+
+    /**
+     * @brief 获取指定通道的基线值
+     * @param channel 通道号 (0~11)
+     * @return uint16_t 基线值
+     */
+    static uint16_t GetTouchBaseline(uint8_t channel) { return Get()->getTouchBaseline(channel); }
+    virtual uint16_t getTouchBaseline(uint8_t channel) { return 0; }
+
+    /**
+     * @brief 检查 MPR121 是否就绪
+     */
+    static bool CheckTouch() { return Get()->checkTouch(); }
+    virtual bool checkTouch() { return false; }
 };
