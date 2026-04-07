@@ -95,12 +95,11 @@ private:
     void _system_config_init();
     void _sum_up();
     
-    // 编码器状态
-    int _encoder_last_a = 0;
-    int _encoder_delta = 0;
-    bool _encoder_left_flag = false;   // 逆时针触发 → BTN_SELECT
-    bool _encoder_right_flag = false;  // 顺时针触发 → BTN_RIGHT
-    unsigned long _encoder_last_trigger_ms = 0;  // 上次触发时间(消抖用)
+    // 编码器状态 (中断驱动，ISR 内判方向)
+    volatile bool _encoder_left_flag = false;
+    volatile bool _encoder_right_flag = false;
+    volatile uint8_t _encoder_a_last = HIGH;
+    static void IRAM_ATTR _encoderISR();
     void _pollEncoder();
 
     // 日志显示控制（单行刷新模式）

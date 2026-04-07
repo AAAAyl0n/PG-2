@@ -40,7 +40,7 @@ void Launcher::onResume()
     HAL::GetCanvas()->setTextScroll(false);
 
     _update_clock(true);
-    
+
     // 初始化最后输入时间
     _data.last_input_time = HAL::Millis();
 }

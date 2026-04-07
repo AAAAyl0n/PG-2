@@ -13,6 +13,25 @@
 #include <Arduino.h>
 #include "../hal_config.h"
 
+// 中断服务：A 变化时立即读 B 判方向（ISR 内读 GPIO 最及时）
+static HAL_Rachel* _hal_instance = nullptr;
+
+void IRAM_ATTR HAL_Rachel::_encoderISR()
+{
+    if (!_hal_instance) return;
+
+    uint8_t a = digitalRead(HAL_PIN_ENC_A);
+    // 只在 B==HIGH 时处理（B 处于稳定高电平）
+    if (digitalRead(HAL_PIN_ENC_B) == HIGH && a != _hal_instance->_encoder_a_last)
+    {
+        if (a == LOW)
+            _hal_instance->_encoder_left_flag = true;
+        else
+            _hal_instance->_encoder_right_flag = true;
+    }
+    _hal_instance->_encoder_a_last = a;
+}
+
 void HAL_Rachel::_gamepad_init()
 {
     spdlog::info("gamepad init");
@@ -35,42 +54,27 @@ void HAL_Rachel::_gamepad_init()
     pinMode(HAL_PIN_JOYSTICK_X, INPUT);
     pinMode(HAL_PIN_JOYSTICK_Y, INPUT);
 
-    // Encoder init
+    // Encoder init (中断驱动，A+B 都变才计数)
     gpio_reset_pin((gpio_num_t)HAL_PIN_ENC_A);
     gpio_reset_pin((gpio_num_t)HAL_PIN_ENC_B);
     pinMode(HAL_PIN_ENC_A, INPUT_PULLUP);
     pinMode(HAL_PIN_ENC_B, INPUT_PULLUP);
-    _encoder_last_a = digitalRead(HAL_PIN_ENC_A);
-    _encoder_delta = 0;
+    _encoder_a_last = digitalRead(HAL_PIN_ENC_A);
+    _hal_instance = this;
+    attachInterrupt(digitalPinToInterrupt(HAL_PIN_ENC_A), _encoderISR, CHANGE);
 
     _key_state_list.fill(false);
 }
 
-// 轮询编码器：仅在 A 下降沿检测，用 B 相判方向，带时间消抖
-#define ENC_DEBOUNCE_MS 30  // 两次触发最小间隔(ms)
-
+// ISR 已完成方向判断，pollEncoder 只是为了兼容调用接口
 void HAL_Rachel::_pollEncoder()
 {
-    int a = digitalRead(HAL_PIN_ENC_A);
-    if (a != _encoder_last_a)
-    {
-        unsigned long now = millis();
-        if (a == LOW && (now - _encoder_last_trigger_ms >= ENC_DEBOUNCE_MS))
-        {
-            int b = digitalRead(HAL_PIN_ENC_B);
-            if (b == HIGH)
-                _encoder_left_flag = true;
-            else
-                _encoder_right_flag = true;
-            _encoder_last_trigger_ms = now;
-        }
-        _encoder_last_a = a;
-    }
+    // 方向已在 ISR 中判定，无需额外处理
 }
 
 bool HAL_Rachel::getButton(GAMEPAD::GamePadButton_t button)
 {
-    // 每次查询按键时顺带轮询编码器
+    // 每次查询按键时顺带处理编码器
     _pollEncoder();
 
     // 编码器虚拟按键：读后即清
@@ -87,7 +91,7 @@ bool HAL_Rachel::getButton(GAMEPAD::GamePadButton_t button)
         return val;
     }
 
-    // 物理按键（START / JOYSTICK）
+    // 物理按键（START / JOYSTICK / BACK）
     if (!digitalRead(_gamepad_key_map[button]))
     {
         if (!_key_state_list[button])

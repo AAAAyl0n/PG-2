@@ -147,8 +147,9 @@ void Launcher::_update_menu()
             _data.last_input_time = HAL::Millis();
         }
 
+        /*
         // 检查自动启动条件
-        if (_data.auto_startup_enabled && 
+        if (_data.auto_startup_enabled &&
             (HAL::Millis() - _data.last_input_time) > _data.auto_startup_delay)
         {
             // 查找 Bangboo 应用
@@ -163,10 +164,11 @@ void Launcher::_update_menu()
                     break;
                 }
             }
-            
+
             // 如果没找到Bangboo应用，重置计时器以避免一直尝试
             _data.last_input_time = HAL::Millis();
         }
+        */
 
         // Update menu
         _data.menu->update(HAL::Millis());

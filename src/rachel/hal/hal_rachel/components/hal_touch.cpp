@@ -78,14 +78,17 @@ void HAL_Rachel::_touch_init()
     _mpr121_write(_i2c_bus, MPR121_ECR, 0x00);
 
     // Baseline filter 参数
+    // Rising (baseline 上升 - 释放后恢复，可以快一点)
     _mpr121_write(_i2c_bus, MPR121_MHDR, 0x01);
     _mpr121_write(_i2c_bus, MPR121_NHDR, 0x01);
     _mpr121_write(_i2c_bus, MPR121_NCLR, 0x0E);
     _mpr121_write(_i2c_bus, MPR121_FDLR, 0x00);
+    // Falling (baseline 下降 - 放慢，防止相邻触摸拖低 baseline)
     _mpr121_write(_i2c_bus, MPR121_MHDF, 0x01);
-    _mpr121_write(_i2c_bus, MPR121_NHDF, 0x05);
-    _mpr121_write(_i2c_bus, MPR121_NCLF, 0x01);
-    _mpr121_write(_i2c_bus, MPR121_FDLF, 0x00);
+    _mpr121_write(_i2c_bus, MPR121_NHDF, 0x01);
+    _mpr121_write(_i2c_bus, MPR121_NCLF, 0x02);  // 需要 2 次采样才允许下降
+    _mpr121_write(_i2c_bus, MPR121_FDLF, 0x02);  // 额外延迟 2 次采样
+    // Touched (触摸状态下的 baseline 跟踪 - 锁定不动)
     _mpr121_write(_i2c_bus, MPR121_NHDT, 0x00);
     _mpr121_write(_i2c_bus, MPR121_NCLT, 0x00);
     _mpr121_write(_i2c_bus, MPR121_FDLT, 0x00);

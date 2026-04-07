@@ -95,9 +95,16 @@ void AppAsciiart::onRunning()
         HAL::GetCanvas()->setCursor(4, 14);
         HAL::GetCanvas()->printf("cx:%4d cy:%4d", _data.center_x, _data.center_y);
 
+        // 编码器调试：显示 A/B 实时电平 + 累计计数
+        static int enc_count = 0;
+        if (HAL::GetButton(GAMEPAD::BTN_RIGHT)) enc_count++;
+        if (HAL::GetButton(GAMEPAD::BTN_SELECT)) enc_count--;
+        HAL::GetCanvas()->setCursor(4, 24);
+        HAL::GetCanvas()->printf("ENC cnt:%d", enc_count);
+
         // 触摸原始值显示 + LED 跟随触摸
         // ELE5→LED0, ELE4→LED2, ELE3→LED4, ELE2→LED6, ELE1→LED8, ELE0→LED10
-        static const int TOUCH_THRESHOLD = 35;
+        static const int TOUCH_THRESHOLD = 25;
         static const int pad_to_led[6] = {10, 8, 6, 4, 2, 0};  // ELE0~ELE5 对应的 LED 位置
         static const uint8_t BRIGHT_CENTER = 255;
         static const uint8_t BRIGHT_SIDE = 90;

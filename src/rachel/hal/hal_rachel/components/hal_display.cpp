@@ -80,7 +80,7 @@ void HAL_Rachel::_disp_init()
 
     HAL_LOGGER_INIT();
     // 可选：将日志改为单行刷新模式，固定在顶部一行
-    setLogSingleLineMode(true, 0, 110);
+    setLogSingleLineMode(true, 0, 230);
     _disp_logo();
     HAL_LOG_INFO("bangboo init");
 }
@@ -91,7 +91,7 @@ void HAL_Rachel::_disp_logo()
 {
     // 清屏并绘制启动图片
     _canvas->fillScreen(TFT_BLACK);
-    _canvas->drawPng(page_init_emptyos, page_init_emptyos_size);
+    _canvas->drawPng(page_init_emptyos, page_init_emptyos_size, 0, 50);
     _canvas->pushSprite(0, 0);
 }
 

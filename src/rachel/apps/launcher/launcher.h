@@ -43,7 +43,7 @@ namespace MOONCAKE::APPS
 
             // App open and close anim
             LVGL::Anim_Path app_anim;
-            
+
             // Auto startup
             bool auto_startup_enabled = true;
             uint32_t auto_startup_delay = 10000;  // 10秒无操作后自动启动
