@@ -153,55 +153,62 @@ void AppRecorder::onRunning()
 
     // Recording step and UI
     if (_data.isRecording) {
+        int16_t peak = 0;
+        unsigned long tLoopStart = HAL::Millis();
         if (!_data.isPaused) {
-            static_cast<HAL_Rachel*>(HAL::Get())->recordWavStep(8192);
+            static_cast<HAL_Rachel*>(HAL::Get())->recordWavStep(8192, &peak);
+            // 归一化到 0~120 (波形区高度)
+            uint8_t h = (uint8_t)((long)peak * 120 / 32768);
+            if (h > 120) h = 120;
+            _data.waveform[_data.waveformIdx] = h;
+            _data.waveformIdx = (_data.waveformIdx + 1) % WAVEFORM_W;
         }
-        
-        HAL::GetCanvas()->fillScreen(TFT_BLACK);
-        /*
-        HAL::GetCanvas()->setCursor(10, 30);
-        HAL::GetCanvas()->print("Recorder");
-        HAL::GetCanvas()->setCursor(10, 60);
-        HAL::GetCanvas()->print(_data.isPaused ? "Paused" : "Recording...");
-        */
-        
-        HAL::GetCanvas()->setTextSize(2);
-        HAL::GetCanvas()->drawCenterString(_data.isPaused ? "Paused" : "Recing", 177, 125);
-        HAL::GetCanvas()->setTextSize(1);
 
-        // compute elapsed ms with pause support
+        unsigned long tAfterRec = HAL::Millis();
+        HAL::GetCanvas()->fillScreen(TFT_BLACK);
+
+        // 上半屏：波形显示 (y: 0~120, 中线 y=60)
+        int centerY = 60;
+        for (int i = 0; i < WAVEFORM_W; i++) {
+            // 从最旧到最新，向左滚动
+            int bufIdx = (_data.waveformIdx + i) % WAVEFORM_W;
+            int half = _data.waveform[bufIdx] / 2;
+            if (half > 0) {
+                HAL::GetCanvas()->drawLine(i, centerY - half, i, centerY + half, TFT_WHITE);
+            }
+        }
+        // 中线
+        HAL::GetCanvas()->drawLine(0, centerY, WAVEFORM_W - 1, centerY, 0x2104);
+
+        // 下半屏：录制状态 + 时间 + 按钮
         unsigned long nowMs = HAL::Millis();
         unsigned long shownMs = computeShownMs(_data.elapsedMsAccum, _data.lastResumeMs, _data.isPaused, nowMs);
         char elapsedBuf[40];
         formatElapsed(elapsedBuf, sizeof(elapsedBuf), shownMs);
 
-        //HAL::GetCanvas()->setCursor(10, 80);
-        //HAL::GetCanvas()->print(elapsedBuf);
-
+        // 红点 + 时间 + 状态
         HAL::GetCanvas()->setTextSize(2);
-        HAL::GetCanvas()->fillSmoothCircle(31, 132, 3, THEME_COLOR_RED);
-        HAL::GetCanvas()->drawString(elapsedBuf, 45, 125, &fonts::Font0);
+        HAL::GetCanvas()->fillSmoothCircle(31, 137, 4, THEME_COLOR_RED);
+        HAL::GetCanvas()->drawString(elapsedBuf, 45, 130, &fonts::Font0);
+        HAL::GetCanvas()->drawString(_data.isPaused ? "PAUSED" : "REC", 140, 130, &fonts::Font0);
         HAL::GetCanvas()->setTextSize(1);
 
-        //------------------------------------------
-        HAL::GetCanvas()->setTextSize(2);
-        HAL::GetCanvas()->drawCenterString(_data.isPaused ? "Paused" : "[Rec]", 120, 42);
-        HAL::GetCanvas()->setTextSize(4);
-        HAL::GetCanvas()->fillSmoothCircle(53, 82, 4, THEME_COLOR_RED);
-        HAL::GetCanvas()->drawCenterString(elapsedBuf, 123, 68);
-        HAL::GetCanvas()->setTextSize(1);
-
-        
-        
-        //HAL::GetCanvas()->drawCenterString(_data.isPaused ? "START: Resume  RIGHT: Finish" : "START: Pause  RIGHT: Finish", 120, 160);
+        // 底部按钮图标
         HAL::GetCanvas()->pushImage(27, 159, 55, 55, image_data_set);
-        if(_data.isPaused) {
+        if (_data.isPaused) {
             HAL::GetCanvas()->pushImage(93, 159, 55, 55, image_data_resume);
         } else {
             HAL::GetCanvas()->pushImage(93, 159, 55, 55, image_data_pause);
         }
         HAL::GetCanvas()->pushImage(159, 159, 55, 55, image_data_finish);
         HAL::CanvasUpdate();
+        unsigned long tEnd = HAL::Millis();
+        unsigned long recMs = tAfterRec - tLoopStart;
+        unsigned long uiMs = tEnd - tAfterRec;
+        unsigned long totalMs = tEnd - tLoopStart;
+        if (totalMs > 40) {
+            spdlog::warn("recLoop: rec={}ms ui={}ms total={}ms", recMs, uiMs, totalMs);
+        }
         return;
     }
     

@@ -219,7 +219,7 @@ public:
 
     // 非阻塞WAV录音：开始/步进/停止
     bool startWavRecording(const char* filename);
-    bool recordWavStep(size_t chunkBytes = 8192);
+    bool recordWavStep(size_t chunkBytes = 8192, int16_t* outPeak = nullptr);
     bool stopWavRecording();
     bool isWavRecording();
 

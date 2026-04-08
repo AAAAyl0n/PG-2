@@ -25,6 +25,7 @@ namespace MOONCAKE::APPS
     class AppRecorder : public APP_BASE
     {
     private:
+        static const int WAVEFORM_W = 240;  // 波形宽度 = 屏幕宽度
         struct Data_t
         {
             unsigned long count = 0;
@@ -39,6 +40,9 @@ namespace MOONCAKE::APPS
             bool rightWasPressed = false;
             unsigned long elapsedMsAccum = 0;
             unsigned long lastResumeMs = 0;
+            // 波形环形缓冲区
+            uint8_t waveform[240] = {0};  // 归一化到 0~120 的振幅
+            int waveformIdx = 0;          // 写入位置
         };
         Data_t _data;
 

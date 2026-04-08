@@ -533,10 +533,12 @@ bool HAL_Rachel::startWavRecording(const char* filename)
     return true;
 }
 
-bool HAL_Rachel::recordWavStep(size_t chunkBytes)
+bool HAL_Rachel::recordWavStep(size_t chunkBytes, int16_t* outPeak)
 {
     if (!s_is_recording) return false;
     if (chunkBytes == 0) return true;
+
+    unsigned long t0 = millis();
 
     const size_t CHUNK = chunkBytes;
     uint8_t* buf = (uint8_t*)malloc(CHUNK);
@@ -545,11 +547,45 @@ bool HAL_Rachel::recordWavStep(size_t chunkBytes)
         return false;
     }
 
+    unsigned long t1 = millis();
+
     size_t bytes_read = 0;
     esp_err_t err = i2s_read(I2S_NUM_0, buf, CHUNK, &bytes_read, pdMS_TO_TICKS(50));
+
+    unsigned long t2 = millis();
+
     if (err == ESP_OK && bytes_read > 0) {
         s_rec_file.write(buf, bytes_read);
         s_rec_written += bytes_read;
+
+        unsigned long t3 = millis();
+
+        // 计算峰值振幅
+        if (outPeak) {
+            int16_t peak = 0;
+            int16_t* samples = (int16_t*)buf;
+            size_t num_samples = bytes_read / sizeof(int16_t);
+            for (size_t i = 0; i < num_samples; i++) {
+                int16_t abs_val = samples[i] < 0 ? -samples[i] : samples[i];
+                if (abs_val > peak) peak = abs_val;
+            }
+            *outPeak = peak;
+        }
+
+        unsigned long t4 = millis();
+
+        // 只在耗时异常时打印，避免刷屏
+        if ((t2 - t1) > 10 || (t3 - t2) > 10 || (t4 - t0) > 30) {
+            spdlog::warn("recStep: malloc={}ms i2s={}ms({}B/{}) sd={}ms peak={}ms total={}ms",
+                         t1 - t0, t2 - t1, bytes_read, CHUNK, t3 - t2, t4 - t3, t4 - t0);
+        }
+    } else {
+        if (outPeak) *outPeak = 0;
+        if (err != ESP_OK) {
+            spdlog::error("recStep: i2s_read err={} after {}ms", (int)err, t2 - t1);
+        } else {
+            spdlog::warn("recStep: i2s_read 0 bytes after {}ms", t2 - t1);
+        }
     }
     free(buf);
     return true;
@@ -566,7 +602,7 @@ bool HAL_Rachel::stopWavRecording()
     s_rec_file.close();
 
     s_is_recording = false;
-    spdlog::info("录音结束，写入 {} 字节", (int)s_rec_written);
+    spdlog::info("录音结束，写入 {} 字节 ({}KB)", (int)s_rec_written, (int)(s_rec_written / 1024));
     return true;
 }
 
