@@ -32,6 +32,7 @@ extern "C" uint16_t tusb_midi_load_descriptor(uint8_t* dst, uint8_t* itf)
     *itf += 2;
     memcpy(dst, descriptor, TUD_MIDI_DESC_LEN);
     return TUD_MIDI_DESC_LEN;
+    
 }
 
 static void _register_midi_interface()
@@ -41,23 +42,59 @@ static void _register_midi_interface()
     _midi_interface_registered = true;
 }
 
-// ---- MIDI helpers ----
+// ---- USB host detection ----
+// App always starts in LOCAL mode. Only LOCAL → USB transition is allowed.
+// To return to LOCAL, restart the app (BOOT key exit + re-enter).
+static volatile bool _usb_connected = false;
+
+static void _usbEventHandler(void* arg, esp_event_base_t base, int32_t id, void* data)
+{
+    if (base != ARDUINO_USB_EVENTS) return;
+    if (id == ARDUINO_USB_STARTED_EVENT || id == ARDUINO_USB_RESUME_EVENT) {
+        _usb_connected = true; // one-way switch to USB
+    }
+}
+
+static bool isUsbConnected()
+{
+    return _usb_connected;
+}
+
+// ---- MIDI helpers (only when USB host is connected) ----
 static void sendNoteOn(uint8_t note, uint8_t velocity, uint8_t channel)
 {
+    if (!isUsbConnected()) return;
     uint8_t msg[3] = {(uint8_t)(0x90 | (channel & 0x0F)), note, velocity};
     tud_midi_stream_write(0, msg, 3);
 }
 
 static void sendNoteOff(uint8_t note, uint8_t velocity, uint8_t channel)
 {
+    if (!isUsbConnected()) return;
     uint8_t msg[3] = {(uint8_t)(0x80 | (channel & 0x0F)), note, velocity};
     tud_midi_stream_write(0, msg, 3);
 }
 
 static void sendAftertouch(uint8_t note, uint8_t pressure, uint8_t channel)
 {
+    if (!isUsbConnected()) return;
     uint8_t msg[3] = {(uint8_t)(0xA0 | (channel & 0x0F)), note, pressure};
     tud_midi_stream_write(0, msg, 3);
+}
+
+// ---- Local sample playback (when USB is unplugged) ----
+// MIDI note → piano sample filename
+// MIDI 36 = C2, 71 = B4 (covered range)
+static const char* NOTE_NAMES[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+static void playLocalNote(uint8_t midiNote)
+{
+    if (midiNote < 36 || midiNote > 71) return;
+    int octave = midiNote / 12 - 1;
+    int idx = midiNote % 12;
+    char path[32];
+    snprintf(path, sizeof(path), "/piano/%s%d.wav", NOTE_NAMES[idx], octave);
+    HAL::PlayWavFile(path);
 }
 
 // ---- Chord table ----
@@ -134,6 +171,8 @@ void AppBangboo::_onChordChange(uint8_t newChord)
 void AppBangboo::onCreate()
 {
     _register_midi_interface();
+    _usb_connected = false; // always start in LOCAL mode
+    USB.onEvent(_usbEventHandler);
     USB.begin();
 
     for (int i = 0; i < 6; i++) {
@@ -200,6 +239,7 @@ void AppBangboo::onRunning()
                         if (_data.activeNote[i] != 0)
                             sendNoteOff(_data.activeNote[i], 0, 0);
                         sendNoteOn(chordNote, 127, 0);
+                        if (!isUsbConnected()) playLocalNote(chordNote);
                         _data.activeNote[i] = chordNote;
                     }
                     _data.stringTouched[i] = true;
@@ -210,6 +250,7 @@ void AppBangboo::onRunning()
                         sendNoteOff(_data.activeNote[i], 0, 0);
                     if (chordNote != 0) {
                         sendNoteOn(chordNote, 127, 0);
+                        if (!isUsbConnected()) playLocalNote(chordNote);
                         _data.activeNote[i] = chordNote;
                     }
                     _data.releaseTime[i] = 0;
@@ -292,6 +333,16 @@ void AppBangboo::_render()
     } else {
         canvas->setTextColor(TFT_DARKGREY);
         canvas->print("0");
+    }
+
+    // Top-right: USB / Local mode indicator
+    canvas->setCursor(180, 4);
+    if (isUsbConnected()) {
+        canvas->setTextColor(TFT_GREEN);
+        canvas->print("USB");
+    } else {
+        canvas->setTextColor(TFT_CYAN);
+        canvas->print("LOCAL");
     }
 
     // Center: chord name
