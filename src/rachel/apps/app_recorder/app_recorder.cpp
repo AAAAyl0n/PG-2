@@ -104,6 +104,7 @@ void AppRecorder::onRunning()
             } else {
                 // Toggle pause/resume within the same session
                 _data.isPaused = !_data.isPaused;
+                static_cast<HAL_Rachel*>(HAL::Get())->setWavRecordingPaused(_data.isPaused);
                 if (_data.isPaused) {
                     // accumulate current segment
                     unsigned long nowMs = HAL::Millis();
@@ -125,6 +126,7 @@ void AppRecorder::onRunning()
             _data.rightWasPressed = true;
             if (_data.isRecording) {
                 bool okStop = static_cast<HAL_Rachel*>(HAL::Get())->stopWavRecording();
+                HAL::SetLedOff();
                 _data.isRecording = false;
                 _data.isPaused = false;
                 _data.elapsedMsAccum = 0;
@@ -154,17 +156,38 @@ void AppRecorder::onRunning()
     // Recording step and UI
     if (_data.isRecording) {
         int16_t peak = 0;
-        unsigned long tLoopStart = HAL::Millis();
         if (!_data.isPaused) {
             static_cast<HAL_Rachel*>(HAL::Get())->recordWavStep(8192, &peak);
-            // 归一化到 0~120 (波形区高度)
-            uint8_t h = (uint8_t)((long)peak * 120 / 32768);
-            if (h > 120) h = 120;
-            _data.waveform[_data.waveformIdx] = h;
-            _data.waveformIdx = (_data.waveformIdx + 1) % WAVEFORM_W;
+            if (peak > _data.peakHold) _data.peakHold = peak;
+
+            // LED 电平表：每次循环都更新（不受 15fps 限制）
+            int litCount = (int)((long)peak * 11 / 32768);
+            if (litCount > 11) litCount = 11;
+            for (int i = 0; i < 11; i++) {
+                if (i >= 11 - litCount) {
+                    int pos = 10 - i;
+                    uint8_t r = (uint8_t)(pos * 255 / 10);
+                    uint8_t g = (uint8_t)((10 - pos) * 255 / 10);
+                    HAL::SetLedColor(i, r, g, 0);
+                } else {
+                    HAL::SetLedColor(i, 0, 0, 0);
+                }
+            }
+            HAL::LedShow();
         }
 
-        unsigned long tAfterRec = HAL::Millis();
+        // 限制 UI + 波形刷新 ~15fps，把 SPI 总线时间让给 SD writer
+        unsigned long now = HAL::Millis();
+        if (now - _data.lastUiUpdateMs < 66) return;  // 66ms ≈ 15fps
+        _data.lastUiUpdateMs = now;
+
+        // 波形：每帧写一个点，用这段时间内的最大 peak
+        uint8_t h = (uint8_t)((long)_data.peakHold * 120 / 32768);
+        if (h > 120) h = 120;
+        _data.waveform[_data.waveformIdx] = h;
+        _data.waveformIdx = (_data.waveformIdx + 1) % WAVEFORM_W;
+        _data.peakHold = 0;
+
         HAL::GetCanvas()->fillScreen(TFT_BLACK);
 
         // 上半屏：波形显示 (y: 0~120, 中线 y=60)
@@ -202,13 +225,6 @@ void AppRecorder::onRunning()
         }
         HAL::GetCanvas()->pushImage(159, 159, 55, 55, image_data_finish);
         HAL::CanvasUpdate();
-        unsigned long tEnd = HAL::Millis();
-        unsigned long recMs = tAfterRec - tLoopStart;
-        unsigned long uiMs = tEnd - tAfterRec;
-        unsigned long totalMs = tEnd - tLoopStart;
-        if (totalMs > 40) {
-            spdlog::warn("recLoop: rec={}ms ui={}ms total={}ms", recMs, uiMs, totalMs);
-        }
         return;
     }
     
@@ -236,4 +252,4 @@ void AppRecorder::onRunning()
     }
 }
 
-void AppRecorder::onDestroy() { spdlog::info("{} onDestroy", getAppName()); }
+void AppRecorder::onDestroy() { HAL::SetLedOff(); spdlog::info("{} onDestroy", getAppName()); }

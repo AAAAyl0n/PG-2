@@ -222,6 +222,7 @@ public:
     bool recordWavStep(size_t chunkBytes = 8192, int16_t* outPeak = nullptr);
     bool stopWavRecording();
     bool isWavRecording();
+    void setWavRecordingPaused(bool paused);
 
     // I2C bus access
     inline m5::I2C_Class* getI2C() { return _i2c_bus; }

@@ -43,6 +43,7 @@ namespace MOONCAKE::APPS
             // 波形环形缓冲区
             uint8_t waveform[240] = {0};  // 归一化到 0~120 的振幅
             int waveformIdx = 0;          // 写入位置
+            int16_t peakHold = 0;         // 帧间最大 peak
         };
         Data_t _data;
 

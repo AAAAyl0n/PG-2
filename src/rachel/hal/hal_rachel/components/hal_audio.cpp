@@ -17,6 +17,8 @@
 #include "driver/i2s.h"
 #include <LittleFS.h>
 #include <FS.h>
+#include <freertos/stream_buffer.h>
+#include <esp_heap_caps.h>
 
 // 静态成员，用于任务访问HAL实例
 static HAL_Rachel* g_hal_instance = nullptr;
@@ -499,7 +501,84 @@ bool HAL_Rachel::recordWavToSd(const char* filename, int durationSeconds)
     return true;
 }
 
-// 非阻塞WAV录音：开始/步进/停止
+// ============ 非阻塞WAV录音 ============
+// 架构：I2S task → StreamBuffer → SD writer task
+// 主循环只读 peak 画 UI，永远不阻塞。
+
+static StreamBufferHandle_t s_rec_stream = nullptr;
+static size_t s_rec_stream_size = 0;
+static volatile bool s_rec_task_run = false;
+static volatile bool s_rec_paused = false;
+static volatile bool s_sd_writer_done = false;
+static volatile int16_t s_current_peak = 0;
+static volatile uint32_t s_overflow_dropped = 0;  // I2S task 计数，SD writer task 打印
+
+// I2S 读取任务：读 I2S → StreamBuffer + 计算 peak
+static void _i2sRecordTask(void* param)
+{
+    const size_t CHUNK = 4096;
+    uint8_t* buf = (uint8_t*)malloc(CHUNK);
+    if (!buf) { s_rec_task_run = false; vTaskDelete(NULL); return; }
+
+    spdlog::info("I2S录音任务已启动");
+    while (s_rec_task_run) {
+        size_t bytes_read = 0;
+        esp_err_t err = i2s_read(I2S_NUM_0, buf, CHUNK, &bytes_read, pdMS_TO_TICKS(100));
+        if (err != ESP_OK || bytes_read == 0) continue;
+        if (s_rec_paused) continue;
+
+        // 计算 peak（供主循环画波形）
+        int16_t peak = 0;
+        int16_t* samples = (int16_t*)buf;
+        size_t n = bytes_read / sizeof(int16_t);
+        for (size_t i = 0; i < n; i++) {
+            int16_t v = samples[i] < 0 ? -samples[i] : samples[i];
+            if (v > peak) peak = v;
+        }
+        s_current_peak = peak;
+
+        // 整块写入或整块丢弃（保持样本帧对齐）
+        size_t space = xStreamBufferSpacesAvailable(s_rec_stream);
+        if (space >= bytes_read) {
+            xStreamBufferSend(s_rec_stream, buf, bytes_read, 0);
+        } else {
+            s_overflow_dropped++;
+        }
+    }
+
+    free(buf);
+    spdlog::info("I2S录音任务已退出");
+    vTaskDelete(NULL);
+}
+
+// SD 写入任务：从 StreamBuffer 读数据 → 写 SD 卡
+static void _sdWriterTask(void* param)
+{
+    const size_t BUF_SIZE = 4096;  // 减小以降低碎片化堆上的分配压力
+    uint8_t* buf = (uint8_t*)malloc(BUF_SIZE);
+    if (!buf) { s_sd_writer_done = true; vTaskDelete(NULL); return; }
+
+    spdlog::info("SD写入任务已启动");
+    while (s_rec_task_run || xStreamBufferBytesAvailable(s_rec_stream) > 0) {
+        size_t got = xStreamBufferReceive(s_rec_stream, buf, BUF_SIZE, pdMS_TO_TICKS(50));
+        if (got > 0) {
+            s_rec_file.write(buf, got);
+            s_rec_written += got;
+        }
+        // 周期性报告溢出（在 SD writer 里打印，不拖慢 I2S task）
+        uint32_t drops = s_overflow_dropped;
+        if (drops > 0) {
+            s_overflow_dropped = 0;
+            spdlog::warn("overflow: {} chunks ({}KB) dropped", drops, drops * 4);
+        }
+    }
+
+    free(buf);
+    spdlog::info("SD写入任务已退出，共写入 {}KB", (int)(s_rec_written / 1024));
+    s_sd_writer_done = true;
+    vTaskDelete(NULL);
+}
+
 bool HAL_Rachel::startWavRecording(const char* filename)
 {
     if (_echobase == nullptr) {
@@ -510,84 +589,74 @@ bool HAL_Rachel::startWavRecording(const char* filename)
         spdlog::error("SD卡不可用");
         return false;
     }
-    if (s_is_recording) {
-        spdlog::warn("录音已在进行中");
+    if (s_is_recording) return false;
+
+    // 打印可用内存，方便后续调整
+    spdlog::info("Free heap: {} bytes, largest block: {} bytes",
+                 esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+    // 渐进创建 StreamBuffer
+    // 400ms SD spike × 192KB/s = 77KB，所以 buffer ≥ 80KB
+    static const size_t TRY_SIZES[] = { 81920, 65536, 49152, 32768 };
+    s_rec_stream = nullptr;
+    s_rec_stream_size = 0;
+    for (size_t sz : TRY_SIZES) {
+        s_rec_stream = xStreamBufferCreate(sz, 1);
+        if (s_rec_stream) { s_rec_stream_size = sz; break; }
+    }
+    if (!s_rec_stream) {
+        spdlog::error("无法创建 StreamBuffer");
         return false;
     }
 
     s_rec_file = SD.open(filename, FILE_WRITE);
     if (!s_rec_file) {
-        spdlog::error("无法创建WAV文件: {}", filename);
+        vStreamBufferDelete(s_rec_stream);
+        s_rec_stream = nullptr;
         return false;
     }
 
-    // 预写WAV头（data_size=0），随后从偏移44开始写PCM
     _write_wav_header(s_rec_file, _audio_sample_rate, 2, 16, 0);
     s_rec_file.seek(44);
 
     s_rec_written = 0;
+    s_rec_paused = false;
+    s_current_peak = 0;
+    s_sd_writer_done = false;
     s_is_recording = true;
+    s_rec_task_run = true;
 
-    _echobase->setMute(true);  // 录音期间静音扬声器，避免串音
-    spdlog::info("开始录音: {}", filename);
-    return true;
-}
+    _echobase->setMute(true);
 
-bool HAL_Rachel::recordWavStep(size_t chunkBytes, int16_t* outPeak)
-{
-    if (!s_is_recording) return false;
-    if (chunkBytes == 0) return true;
+    spdlog::info("创建任务前 free heap: {}", esp_get_free_heap_size());
 
-    unsigned long t0 = millis();
+    // 启动 I2S 任务（最高优先级，core 0）
+    BaseType_t r1 = xTaskCreatePinnedToCore(_i2sRecordTask, "I2S_Rec", 4096, nullptr,
+        configMAX_PRIORITIES - 2, nullptr, 0);
 
-    const size_t CHUNK = chunkBytes;
-    uint8_t* buf = (uint8_t*)malloc(CHUNK);
-    if (!buf) {
-        spdlog::error("recordWavStep: 内存不足");
+    // 启动 SD 写入任务（中优先级，core 0）
+    BaseType_t r2 = xTaskCreatePinnedToCore(_sdWriterTask, "SD_Wr", 4096, nullptr,
+        configMAX_PRIORITIES - 4, nullptr, 0);
+
+    if (r1 != pdPASS || r2 != pdPASS) {
+        spdlog::error("任务创建失败: I2S={} SD={}", (int)r1, (int)r2);
+        s_rec_task_run = false;
+        s_is_recording = false;
+        s_rec_file.close();
+        vStreamBufferDelete(s_rec_stream);
+        s_rec_stream = nullptr;
         return false;
     }
 
-    unsigned long t1 = millis();
+    spdlog::info("开始录音: {} (buf={}KB)", filename, s_rec_stream_size / 1024);
+    return true;
+}
 
-    size_t bytes_read = 0;
-    esp_err_t err = i2s_read(I2S_NUM_0, buf, CHUNK, &bytes_read, pdMS_TO_TICKS(50));
-
-    unsigned long t2 = millis();
-
-    if (err == ESP_OK && bytes_read > 0) {
-        s_rec_file.write(buf, bytes_read);
-        s_rec_written += bytes_read;
-
-        unsigned long t3 = millis();
-
-        // 计算峰值振幅
-        if (outPeak) {
-            int16_t peak = 0;
-            int16_t* samples = (int16_t*)buf;
-            size_t num_samples = bytes_read / sizeof(int16_t);
-            for (size_t i = 0; i < num_samples; i++) {
-                int16_t abs_val = samples[i] < 0 ? -samples[i] : samples[i];
-                if (abs_val > peak) peak = abs_val;
-            }
-            *outPeak = peak;
-        }
-
-        unsigned long t4 = millis();
-
-        // 只在耗时异常时打印，避免刷屏
-        if ((t2 - t1) > 10 || (t3 - t2) > 10 || (t4 - t0) > 30) {
-            spdlog::warn("recStep: malloc={}ms i2s={}ms({}B/{}) sd={}ms peak={}ms total={}ms",
-                         t1 - t0, t2 - t1, bytes_read, CHUNK, t3 - t2, t4 - t3, t4 - t0);
-        }
-    } else {
-        if (outPeak) *outPeak = 0;
-        if (err != ESP_OK) {
-            spdlog::error("recStep: i2s_read err={} after {}ms", (int)err, t2 - t1);
-        } else {
-            spdlog::warn("recStep: i2s_read 0 bytes after {}ms", t2 - t1);
-        }
-    }
-    free(buf);
+// 主循环调用：不写 SD，只返回 peak
+bool HAL_Rachel::recordWavStep(size_t chunkBytes, int16_t* outPeak)
+{
+    if (!s_is_recording) return false;
+    if (outPeak) *outPeak = s_current_peak;
     return true;
 }
 
@@ -595,11 +664,17 @@ bool HAL_Rachel::stopWavRecording()
 {
     if (!s_is_recording) return false;
 
+    // 停止 I2S 任务，SD writer 会自动排空后退出
+    s_rec_task_run = false;
+    while (!s_sd_writer_done) vTaskDelay(pdMS_TO_TICKS(10));
+
     _echobase->setMute(_audio_muted);
 
-    // 回写正确WAV头，包含实际data大小
     _write_wav_header(s_rec_file, _audio_sample_rate, 2, 16, (uint32_t)s_rec_written);
     s_rec_file.close();
+
+    vStreamBufferDelete(s_rec_stream);
+    s_rec_stream = nullptr;
 
     s_is_recording = false;
     spdlog::info("录音结束，写入 {} 字节 ({}KB)", (int)s_rec_written, (int)(s_rec_written / 1024));
@@ -609,4 +684,12 @@ bool HAL_Rachel::stopWavRecording()
 bool HAL_Rachel::isWavRecording()
 {
     return s_is_recording;
+}
+
+void HAL_Rachel::setWavRecordingPaused(bool paused)
+{
+    s_rec_paused = paused;
+    if (!paused && s_rec_stream) {
+        xStreamBufferReset(s_rec_stream);
+    }
 }
