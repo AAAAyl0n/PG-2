@@ -64,7 +64,7 @@ void AppRecorder::onRunning()
 {
     // Inputs
     bool startDown = HAL::GetButton(GAMEPAD::BTN_START);
-    bool selectDown = HAL::GetButton(GAMEPAD::BTN_SELECT);
+    bool selectDown = HAL::GetButton(GAMEPAD::BTN_BACK);
     bool rightDown = HAL::GetButton(GAMEPAD::BTN_RIGHT);
 
     if (startDown) {

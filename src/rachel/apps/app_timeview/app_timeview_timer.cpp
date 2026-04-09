@@ -62,11 +62,11 @@ void AppTimeview::_renderTimer()
     // 第二排：分钟:秒
     snprintf(second_line, sizeof(second_line), "%02u:%02u", (unsigned)_data.timerCache.mm, (unsigned)_data.timerCache.ss);
 
-    HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+    HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
     HAL::GetCanvas()->setTextSize(2);
-    HAL::GetCanvas()->drawCenterString(first_line, 120, 42);
+    HAL::GetCanvas()->drawCenterString(first_line, 120, 84);
     HAL::GetCanvas()->setTextSize(4);
-    HAL::GetCanvas()->drawCenterString(second_line, 120, 68);
+    HAL::GetCanvas()->drawCenterString(second_line, 120, 110);
 }
 
 void AppTimeview::_updateTimer()
@@ -123,11 +123,11 @@ void AppTimeview::_enterTimerSettings()
                 HAL::GetCanvas()->fillScreen(THEME_COLOR_BLACK);
                 char buf[20];
                 snprintf(buf, sizeof(buf), "%d", hh);
-                HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+                HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
                 HAL::GetCanvas()->setTextSize(4);
-                HAL::GetCanvas()->drawCenterString(buf, 120, 62);
+                HAL::GetCanvas()->drawCenterString(buf, 120, 104);
                 HAL::GetCanvas()->setTextSize(2);
-                HAL::GetCanvas()->drawCenterString("-     +", 120, 72);
+                HAL::GetCanvas()->drawCenterString("-     +", 120, 114);
                 _renderPopup();
                 HAL::CanvasUpdate();
                 HAL::Delay(10);
@@ -138,11 +138,11 @@ void AppTimeview::_enterTimerSettings()
         HAL::GetCanvas()->fillScreen(THEME_COLOR_BLACK);
         char buf[20];
         snprintf(buf, sizeof(buf), "%d", hh);
-        HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+        HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
         HAL::GetCanvas()->setTextSize(4);
-        HAL::GetCanvas()->drawCenterString(buf, 120, 62);
+        HAL::GetCanvas()->drawCenterString(buf, 120, 104);
         HAL::GetCanvas()->setTextSize(2);
-        HAL::GetCanvas()->drawCenterString("-     +", 120, 72);
+        HAL::GetCanvas()->drawCenterString("-     +", 120, 114);
         _renderPopup();
         HAL::CanvasUpdate();
 
@@ -194,11 +194,11 @@ void AppTimeview::_enterTimerSettings()
                 HAL::GetCanvas()->fillScreen(THEME_COLOR_BLACK);
                 char buf[20];
                 snprintf(buf, sizeof(buf), "%d", mm);
-                HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+                HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
                 HAL::GetCanvas()->setTextSize(4);
-                HAL::GetCanvas()->drawCenterString(buf, 120, 62);
+                HAL::GetCanvas()->drawCenterString(buf, 120, 104);
                 HAL::GetCanvas()->setTextSize(2);
-                HAL::GetCanvas()->drawCenterString("-     +", 120, 72);
+                HAL::GetCanvas()->drawCenterString("-     +", 120, 114);
                 _renderPopup();
                 HAL::CanvasUpdate();
                 HAL::Delay(10);
@@ -209,11 +209,11 @@ void AppTimeview::_enterTimerSettings()
         HAL::GetCanvas()->fillScreen(THEME_COLOR_BLACK);
         char buf[20];
         snprintf(buf, sizeof(buf), "%d", mm);
-        HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+        HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
         HAL::GetCanvas()->setTextSize(4);
-        HAL::GetCanvas()->drawCenterString(buf, 120, 62);
+        HAL::GetCanvas()->drawCenterString(buf, 120, 104);
         HAL::GetCanvas()->setTextSize(2);
-        HAL::GetCanvas()->drawCenterString("-     +", 120, 72);
+        HAL::GetCanvas()->drawCenterString("-     +", 120, 114);
         _renderPopup();
         HAL::CanvasUpdate();
 
@@ -262,11 +262,11 @@ void AppTimeview::_enterTimerSettings()
                 HAL::GetCanvas()->fillScreen(THEME_COLOR_BLACK);
                 char buf[20];
                 snprintf(buf, sizeof(buf), "%d", ss);
-                HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+                HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
                 HAL::GetCanvas()->setTextSize(4);
-                HAL::GetCanvas()->drawCenterString(buf, 120, 62);
+                HAL::GetCanvas()->drawCenterString(buf, 120, 104);
                 HAL::GetCanvas()->setTextSize(2);
-                HAL::GetCanvas()->drawCenterString("-     +", 120, 72);
+                HAL::GetCanvas()->drawCenterString("-     +", 120, 114);
                 _renderPopup();
                 HAL::CanvasUpdate();
                 HAL::Delay(10);
@@ -277,11 +277,11 @@ void AppTimeview::_enterTimerSettings()
         HAL::GetCanvas()->fillScreen(THEME_COLOR_BLACK);
         char buf[20];
         snprintf(buf, sizeof(buf), "%d", ss);
-        HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+        HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
         HAL::GetCanvas()->setTextSize(4);
-        HAL::GetCanvas()->drawCenterString(buf, 120, 62);
+        HAL::GetCanvas()->drawCenterString(buf, 120, 104);
         HAL::GetCanvas()->setTextSize(2);
-        HAL::GetCanvas()->drawCenterString("-     +", 120, 72);
+        HAL::GetCanvas()->drawCenterString("-     +", 120, 114);
         _renderPopup();
         HAL::CanvasUpdate();
 

@@ -67,7 +67,7 @@ void AppMusic::onRunning()
     // Inputs
     bool startDown = HAL::GetButton(GAMEPAD::BTN_START);
     bool rightDown = HAL::GetButton(GAMEPAD::BTN_RIGHT);
-    bool selectDown = HAL::GetButton(GAMEPAD::BTN_SELECT);
+    bool selectDown = HAL::GetButton(GAMEPAD::BTN_BACK);
 
     // START: play current (restart if already playing)
     if (startDown) {

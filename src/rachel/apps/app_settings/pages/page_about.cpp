@@ -19,6 +19,8 @@ void AppSettings::_page_about()
     HAL::GetCanvas()->drawPng(page_about_png, page_about_png_size);
     HAL::CanvasUpdate();
 
+    HAL::SetAllLedColor(0, 255, 255);
+
     while (1)
     {
         if (HAL::GetAnyButton())
@@ -29,4 +31,6 @@ void AppSettings::_page_about()
         }
         HAL::Delay(50);
     }
+
+    HAL::SetAllLedColor(0, 0, 0);
 }

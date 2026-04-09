@@ -14,6 +14,7 @@
 #include "../../assets/theme/theme.h"
 #include "../assets/launcher_bottom_panel.hpp"
 #include <cmath>
+#include <cstring>
 #include <string>
 
 class LauncherRenderCallBack : public SMOOTH_MENU::SimpleMenuCallback_t
@@ -26,6 +27,22 @@ private:
 
 public:
     LauncherRenderCallBack() : _x_offset(0), _y_offset(0), _anim_value_buffer(0), _clock(nullptr) {}
+
+    // Short tagline shown under each app's title in the launcher.
+    static const char* _appDescription(const char* name)
+    {
+        if (!name) return nullptr;
+        if (!strcmp(name, "Daizy"))    return "Vibe Music From Here";
+        if (!strcmp(name, "Check"))    return "Hope I'm not sick";
+        if (!strcmp(name, "Settings")) return "Display, sleep, info";
+        if (!strcmp(name, "Music"))    return "Didn't expect I'm actually an iPod.";
+        if (!strcmp(name, "Recorder")) return "Voice memo recorder";
+        if (!strcmp(name, "Timeview")) return "Clock / timer / stopwatch";
+        if (!strcmp(name, "Imutest"))  return "IMU sensor monitor";
+        if (!strcmp(name, "gifplayer"))return "GIF animation player";
+        if (!strcmp(name, "Poweroff")) return "Bye Bye--";
+        return nullptr;
+    }
 
     LVGL::Anim_Path statusBarAnim;
     LVGL::Anim_Path bottomPanelAnim;
@@ -111,14 +128,28 @@ public:
 
                 // // With anim
                 // HAL::GetCanvas()->drawCenterString(item->tag.c_str(), 120, _anim_value_buffer + 15);
+                // App title (larger, slightly lower)
                 HAL::GetCanvas()->setTextColor(TFT_WHITE);
-                HAL::GetCanvas()->setTextSize(1);
+                HAL::GetCanvas()->setTextSize(2);
                 HAL::GetCanvas()->drawCenterString(
-                    item->tag.c_str(), 
-                    120, 
-                    THEME_APP_ICON_MARGIN_TOP + THEME_APP_ICON_HEIGHT + 6,
+                    item->tag.c_str(),
+                    120,
+                    THEME_APP_ICON_MARGIN_TOP + THEME_APP_ICON_HEIGHT + 19,
                     &fonts::Font0
                 );
+
+                // App description (smallest font, dark grey)
+                HAL::GetCanvas()->setTextSize(1);
+                HAL::GetCanvas()->setTextColor(TFT_DARKGREY);
+                const char* desc = _appDescription(item->tag.c_str());
+                if (desc) {
+                    HAL::GetCanvas()->drawCenterString(
+                        desc,
+                        120,
+                        THEME_APP_ICON_MARGIN_TOP + THEME_APP_ICON_HEIGHT + 43,
+                        &fonts::Font0
+                    );
+                }
             }
         }
         /* --------------------------------------------------------------------------------------------- */

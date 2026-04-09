@@ -21,11 +21,11 @@ void AppTimeview::_renderClock()
     }
     strftime(time_buffer, sizeof(time_buffer), "%H:%M", t);
 
-    HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+    HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
     HAL::GetCanvas()->setTextSize(2);
-    HAL::GetCanvas()->drawCenterString(date_buffer, 120, 42);
+    HAL::GetCanvas()->drawCenterString(date_buffer, 120, 84);
     HAL::GetCanvas()->setTextSize(4);
-    HAL::GetCanvas()->drawCenterString(time_buffer, 120, 68);
+    HAL::GetCanvas()->drawCenterString(time_buffer, 120, 110);
 }
 
 

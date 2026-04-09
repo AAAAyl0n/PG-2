@@ -17,7 +17,7 @@ using namespace SYSTEM::UI;
 void SelectMenu::_create_menu(std::vector<std::string>& itemList)
 {
     // Create menu
-    _data.menu = new SMOOTH_MENU::Simple_Menu(HAL::GetCanvas()->width(), HAL::GetCanvas()->height()/240 * 90);
+    _data.menu = new SMOOTH_MENU::Simple_Menu(HAL::GetCanvas()->width(), HAL::GetCanvas()->height());
 
     // Push items into menu
     int text_width = 12;

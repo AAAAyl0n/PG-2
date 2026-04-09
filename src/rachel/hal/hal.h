@@ -52,8 +52,8 @@ namespace CONFIG
     {
         uint8_t brightness = 127;
         uint8_t volume = 127;
-        // 设备型号：0=Eous, 1=Amillion, 2=paperboo
-        uint8_t model = 0;
+        // MIDI UI 模式：0=Normal（屏幕中央显示和弦名）, 1=BOX（九宫格高亮）
+        uint8_t midi_ui_mode = 0;
         // 自动休眠时长：0=10min, 1=30min, 2=60min, 3=Never
         uint8_t auto_sleep_timeout = 0;
     };

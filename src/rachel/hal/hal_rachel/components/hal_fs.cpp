@@ -55,10 +55,10 @@ void HAL_Rachel::loadSystemConfig()
     // Copy configs
     _config.brightness = doc["brightness"];
     _config.volume = doc["volume"];
-    if (doc.containsKey("model"))
-        _config.model = doc["model"];
+    if (doc.containsKey("midi_ui_mode"))
+        _config.midi_ui_mode = doc["midi_ui_mode"];
     else
-        _config.model = 0; // 默认 Eous
+        _config.midi_ui_mode = 0; // 默认 Normal
     if (doc.containsKey("auto_sleep_timeout"))
         _config.auto_sleep_timeout = doc["auto_sleep_timeout"];
     else
@@ -82,7 +82,7 @@ void HAL_Rachel::saveSystemConfig()
     DynamicJsonDocument doc(2048);
     doc["brightness"] = _config.brightness;
     doc["volume"] = _config.volume;
-    doc["model"] = _config.model;
+    doc["midi_ui_mode"] = _config.midi_ui_mode;
     doc["auto_sleep_timeout"] = _config.auto_sleep_timeout;
 
     // Save file

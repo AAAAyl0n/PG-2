@@ -38,7 +38,7 @@ namespace MOONCAKE::APPS
 
     class AppAsciiart_Packer : public APP_PACKER_BASE
     {
-        std::string getAppName() override { return "Joystick"; }
+        std::string getAppName() override { return "Check"; }
         void* getAppIcon() override { return (void*)image_data_icon_app_asciiart; }
         void* newApp() override { return new AppAsciiart; }
         void deleteApp(void* app) override { delete (AppAsciiart*)app; }

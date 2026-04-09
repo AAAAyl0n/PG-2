@@ -1,4 +1,6 @@
-# PocketGuitar
+# www.daizy.top
+
+# PG-2
 
 通过电容触摸弦、模拟摇杆和旋转编码器实现和弦演奏。
 

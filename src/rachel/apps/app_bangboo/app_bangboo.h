@@ -6,8 +6,10 @@
  */
 #pragma once
 #include <mooncake.h>
+#include <string>
 #include "assets/icon_app_bangboo.hpp"
 #include "../assets/icons/icons.h"
+#include "../utils/smooth_menu/lv_anim/lv_anim.h"
 
 namespace MOONCAKE::APPS
 {
@@ -24,14 +26,29 @@ namespace MOONCAKE::APPS
             bool joystickPressed = false;
 
             uint8_t currentChord = 0;      // 0-8 和弦索引
+            uint32_t lastChordActivity = 0;// 上次摇杆推到非中心方向的时间
             int centerX = 2048;            // 摇杆校准中心
             int centerY = 2048;
+
+            uint8_t groupIndex = 0;        // 组索引（不同八度）
+            bool encoderCwPressed = false; // 编码器去抖
+            bool encoderCcwPressed = false;
+
+            // ---- Group-name dropdown popup（参考 timeview） ----
+            std::string popupText;
+            bool popupVisible = false;
+            bool popupAnimating = false;
+            uint32_t popupShowTime = 0;
+            uint32_t popupDisplayDuration = 1500;  // 1.5s 后自动收起
+            LVGL::Anim_Path popupSlideAnim;
         };
         Data_t _data;
 
         int _getJoystickZone();
         void _onChordChange(uint8_t newChord);
         void _render();
+        void _showGroupPopup(const char* text);
+        void _renderPopup();
 
     public:
         void onCreate() override;
@@ -42,7 +59,7 @@ namespace MOONCAKE::APPS
 
     class AppBangboo_Packer : public APP_PACKER_BASE
     {
-        std::string getAppName() override { return "MIDI"; }
+        std::string getAppName() override { return "Daizy"; }
         void* getAppIcon() override { return (void*)image_data_icon_app_bangboo; }
         void* newApp() override { return new AppBangboo; }
         void deleteApp(void* app) override { delete (AppBangboo*)app; }

@@ -26,18 +26,18 @@ void AppTimeview::_renderStopwatch()
     // 分秒显示
     snprintf(centisec_str, sizeof(centisec_str), ".%02u", (unsigned)_data.stopwatchCache.centisec);
 
-    HAL::GetCanvas()->setTextColor(THEME_COLOR_LawnGreen);
+    HAL::GetCanvas()->setTextColor(THEME_COLOR_WHITE);
     HAL::GetCanvas()->setTextSize(2);
-    HAL::GetCanvas()->drawCenterString(first_line, 120, 42);
-    
+    HAL::GetCanvas()->drawCenterString(first_line, 120, 84);
+
     // 第二排：分钟:秒（大字体）
     HAL::GetCanvas()->setTextSize(4);
-    HAL::GetCanvas()->drawCenterString(second_line, 120, 68);
-    
+    HAL::GetCanvas()->drawCenterString(second_line, 120, 110);
+
     // 分秒计时（小字体，显示在秒数右侧）
     HAL::GetCanvas()->setTextSize(1);
     // 计算秒数右侧位置：120是中心，second_line大约占用的宽度的一半 + 分秒文本的偏移
-    HAL::GetCanvas()->drawString(centisec_str, 120 + 57, 68 + 21, &fonts::Font0);
+    HAL::GetCanvas()->drawString(centisec_str, 120 + 57, 110 + 21, &fonts::Font0);
 }
 
 void AppTimeview::_updateStopwatch()
