@@ -59,6 +59,14 @@ void HAL_Rachel::loadSystemConfig()
         _config.midi_ui_mode = doc["midi_ui_mode"];
     else
         _config.midi_ui_mode = 0; // 默认 Normal
+    if (doc.containsKey("audio_mode"))
+        _config.audio_mode = doc["audio_mode"];
+    else
+        _config.audio_mode = 0; // 默认 Local
+    if (doc.containsKey("audio_mode"))
+        _config.audio_mode = doc["audio_mode"];
+    else
+        _config.audio_mode = 0; // 默认 Local
     if (doc.containsKey("auto_sleep_timeout"))
         _config.auto_sleep_timeout = doc["auto_sleep_timeout"];
     else
@@ -83,6 +91,7 @@ void HAL_Rachel::saveSystemConfig()
     doc["brightness"] = _config.brightness;
     doc["volume"] = _config.volume;
     doc["midi_ui_mode"] = _config.midi_ui_mode;
+    doc["audio_mode"] = _config.audio_mode;
     doc["auto_sleep_timeout"] = _config.auto_sleep_timeout;
 
     // Save file

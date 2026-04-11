@@ -97,6 +97,12 @@ void AppSettings::_page_display()
         if (midi_ui > 1) midi_ui = 0;
         items.push_back(std::string("MIDI UI  ") + midi_ui_names[midi_ui]);
 
+        // Audio output mode select
+        const char* audio_names[] = {"Local", "USB"};
+        uint8_t audio = HAL::GetSystemConfig().audio_mode;
+        if (audio > 1) audio = 0;
+        items.push_back(std::string("Audio    ") + audio_names[audio]);
+
         // Auto sleep timeout select
         uint8_t sleep_timeout = HAL::GetSystemConfig().auto_sleep_timeout;
         if (sleep_timeout > 3) sleep_timeout = 0;
@@ -123,8 +129,19 @@ void AppSettings::_page_display()
                 _data.is_config_changed = true;
             }
         }
-        // Auto sleep timeout select
+        // Audio output mode select
         else if (selected == 3)
+        {
+            std::vector<std::string> select_items = {"[AUDIO]", "Local", "USB", "Back"};
+            auto choose = _data.select_menu->waitResult(select_items);
+            if (choose >= 1 && choose <= 2)
+            {
+                HAL::GetSystemConfig().audio_mode = static_cast<uint8_t>(choose - 1);
+                _data.is_config_changed = true;
+            }
+        }
+        // Auto sleep timeout select
+        else if (selected == 4)
         {
             std::vector<std::string> select_items = {"[SLEEP TIMEOUT]", "10min", "30min", "60min", "Never", "Back"};
             auto choose = _data.select_menu->waitResult(select_items);

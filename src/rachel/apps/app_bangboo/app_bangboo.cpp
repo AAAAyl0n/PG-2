@@ -53,42 +53,35 @@ static void _register_midi_interface()
     _midi_interface_registered = true;
 }
 
-// ---- USB host detection ----
-// App always starts in LOCAL mode. Only LOCAL → USB transition is allowed.
-// To return to LOCAL, restart the app (BOOT key exit + re-enter).
-static volatile bool _usb_connected = false;
-
-static void _usbEventHandler(void* arg, esp_event_base_t base, int32_t id, void* data)
+// ---- Audio routing ----
+// Source of truth is Settings → Display → Audio (HAL system config).
+//   audio_mode == 0  → Local (board mixer plays WAV samples)
+//   audio_mode == 1  → USB   (only USB MIDI out, no local audio)
+// Switching is live: changing the setting takes effect immediately on the
+// next note event without restarting the app.
+static bool isUsbMode()
 {
-    if (base != ARDUINO_USB_EVENTS) return;
-    if (id == ARDUINO_USB_STARTED_EVENT || id == ARDUINO_USB_RESUME_EVENT) {
-        _usb_connected = true; // one-way switch to USB
-    }
+    return HAL::GetSystemConfig().audio_mode == 1;
 }
 
-static bool isUsbConnected()
-{
-    return _usb_connected;
-}
-
-// ---- MIDI helpers (only when USB host is connected) ----
+// ---- MIDI helpers (only emitted when in USB mode) ----
 static void sendNoteOn(uint8_t note, uint8_t velocity, uint8_t channel)
 {
-    if (!isUsbConnected()) return;
+    if (!isUsbMode()) return;
     uint8_t msg[3] = {(uint8_t)(0x90 | (channel & 0x0F)), note, velocity};
     tud_midi_stream_write(0, msg, 3);
 }
 
 static void sendNoteOff(uint8_t note, uint8_t velocity, uint8_t channel)
 {
-    if (!isUsbConnected()) return;
+    if (!isUsbMode()) return;
     uint8_t msg[3] = {(uint8_t)(0x80 | (channel & 0x0F)), note, velocity};
     tud_midi_stream_write(0, msg, 3);
 }
 
 static void sendAftertouch(uint8_t note, uint8_t pressure, uint8_t channel)
 {
-    if (!isUsbConnected()) return;
+    if (!isUsbMode()) return;
     uint8_t msg[3] = {(uint8_t)(0xA0 | (channel & 0x0F)), note, pressure};
     tud_midi_stream_write(0, msg, 3);
 }
@@ -458,12 +451,31 @@ static const char* CW_NAMES_PTR[CHORD_COUNT] = {
 };
 static int8_t CW_OFFSET = 4;
 
+// ---- Fm — curated chord set (replaces former G2) ---------------------------
+// Voicings transcribed from the user-provided diagrams. Each row maps the
+// 6 guitar strings (low E → high E) to MIDI notes; 0 = muted.
+//                                    6弦  5弦  4弦  3弦  2弦  1弦
+static const uint8_t CHORDS_FM[CHORD_COUNT][6] = {
+    {40, 45, 50, 55, 59, 64},  // 0 Daizy     E  A  D  G  B  E   open strings
+    { 0,  0, 53, 57, 62, 64},  // 1 Fmaj7/13  xx 3 2 3 0   = F A D E
+    { 0,  0, 52, 55, 62, 64},  // 2 Em7       xx 2 0 3 0   = E G D E
+    { 0,  0, 52, 55, 60, 64},  // 3 C/E       xx 2 0 1 0   = E G C E
+    { 0, 50, 53, 60,  0,  0},  // 4 Dm7       x 5 3 5 xx   = D F C (5th 把位)
+    { 0, 50, 53, 59,  0,  0},  // 5 Dm6       x 5 3 4 xx   = D F B
+    { 0, 52, 56, 62, 64,  0},  // 6 E7  (6th) x 7 6 7 5 x  = E G# D E (高把位)
+    { 0, 52, 56, 59,  0,  0},  // 7 E   (4th) x 7 6 4 xx   = E G# B  (高把位)
+    { 0,  0, 53, 57, 60, 64},  // 8 Fmaj7     xx 3 2 1 0   = F A C E (slot 8 占位)
+};
+static const char* NAMES_FM[CHORD_COUNT] = {
+    "Daizy", "Fmaj7/13", "Em7", "C/E", "Dm7", "Dm6", "E7", "E", "Fmaj7"
+};
+
 // Note: GROUPS is non-const so that the CW slot's offset can be updated at
-// runtime. Built-in groups (G1/G2/GH) still point at const tables, so their
+// runtime. Built-in groups (G1/Fm/GH) still point at const tables, so their
 // chord notes/names remain immutable.
 static Group GROUPS[] = {
     {"G1", CHORDS_STD, NAMES_STD,  0},
-    {"G2", CHORDS_STD, NAMES_STD, 12},
+    {"Fm", CHORDS_FM,  NAMES_FM,   0},
     {"GH", CHORDS_GH,  NAMES_GH,   4},  // capo 4品
     {"CW", CW_CHORDS,  CW_NAMES_PTR, 4},  // 可由 SysEx 实时下发
 };
@@ -625,9 +637,7 @@ void AppBangboo::_onChordChange(uint8_t newChord)
 void AppBangboo::onCreate()
 {
     _register_midi_interface();
-    _usb_connected = false; // always start in LOCAL mode
-    USB.onEvent(_usbEventHandler);
-    USB.begin();
+    USB.begin();  // bring up TinyUSB so SysEx + MIDI out work in USB mode
 
     MidiMixer::init();
 
@@ -737,7 +747,7 @@ void AppBangboo::onRunning()
                         if (_data.activeNote[i] != 0)
                             sendNoteOff(_data.activeNote[i], 0, 0);
                         sendNoteOn(chordNote, 127, 0);
-                        if (!isUsbConnected()) playLocalNote(chordNote, sustainMs);
+                        if (!isUsbMode()) playLocalNote(chordNote, sustainMs);
                         _data.activeNote[i] = chordNote;
                     }
                     _data.stringTouched[i] = true;
@@ -748,7 +758,7 @@ void AppBangboo::onRunning()
                         sendNoteOff(_data.activeNote[i], 0, 0);
                     if (chordNote != 0) {
                         sendNoteOn(chordNote, 127, 0);
-                        if (!isUsbConnected()) playLocalNote(chordNote, sustainMs);
+                        if (!isUsbMode()) playLocalNote(chordNote, sustainMs);
                         _data.activeNote[i] = chordNote;
                     }
                     _data.releaseTime[i] = 0;
@@ -837,7 +847,7 @@ void AppBangboo::_render()
     }
 
     // Top-right: USB / Local mode indicator
-    if (isUsbConnected()) {
+    if (isUsbMode()) {
         canvas->setCursor(222, 4);
         canvas->print("USB");
     } else {
