@@ -1,5 +1,7 @@
 # www.daizy.top
 
+This project is owned and maintained only by [Ayl0n](https://github.com/Ayl0n) for now.
+
 # PG-2
 
 通过电容触摸弦、模拟摇杆和旋转编码器实现和弦演奏。

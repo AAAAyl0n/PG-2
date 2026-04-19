@@ -407,14 +407,14 @@ static const uint8_t CHORDS_GH[CHORD_COUNT][6] = {
     {41, 45, 53, 57, 60, 64},  // 1 Fmaj7     F  A  F  A  C  E   (low F + open A)
     {40, 47, 50, 55, 59, 64},  // 2 Em7       E  B  D  G  B  E
     {38, 45, 50, 57, 60, 64},  // 3 Am/D      D  A  D  A  C  E   (D bass)
-    { 0,  0, 51, 55, 59, 64},  // 4 Em7/D#    xx D# G  B  E      (slash chord)
+    { 0, 48, 52, 55, 60,  0},  // 4 C         x 3 2 0 1 x  = C E G C  (top=根音C, 结束感)
     { 0, 48, 52, 57, 59, 64},  // 5 Asus2/C   x  C  E  A  B  E   (slash chord)
     {40, 48, 52, 55, 59, 64},  // 6 Cmaj7     E  C  E  G  B  E   (low E = 3rd)
     {40, 45, 52, 57, 60, 67},  // 7 Am/E      0  0 2 2 1 3 (1弦=2弦+2格)
     {38, 45, 50, 57, 60, 65},  // 8 Dm7       D  A  D  A  C  F   (replaces C#)
 };
 static const char* NAMES_GH[CHORD_COUNT] = {
-    "Daizy", "Fmaj7", "Em7", "Am/D", "Em7/D#", "Asus2/C", "Cmaj7", "Am/E", "Dm7"
+    "Daizy", "Fmaj7", "Em7", "Am/D", "C", "Asus2/C", "Cmaj7", "Am/E", "Dm7"
 };
 
 // ---- Group definitions ----
@@ -435,14 +435,14 @@ static uint8_t CW_CHORDS[CHORD_COUNT][6] = {
     {41, 45, 53, 57, 60, 64},
     {40, 47, 50, 55, 59, 64},
     {38, 45, 50, 57, 60, 64},
-    { 0,  0, 51, 55, 59, 64},
+    { 0, 48, 52, 55, 60,  0},
     { 0, 48, 52, 57, 59, 64},
     {40, 48, 52, 55, 59, 64},
     {40, 45, 52, 57, 60, 67},
     {38, 45, 50, 57, 60, 65},
 };
 static char  CW_NAMES_BUF[CHORD_COUNT][CW_NAME_MAX] = {
-    "Daizy", "Fmaj7", "Em7", "Am/D", "Em7/D#", "Asus2/C", "Cmaj7", "Am/E", "Dm7"
+    "Daizy", "Fmaj7", "Em7", "Am/D", "C", "Asus2/C", "Cmaj7", "Am/E", "Dm7"
 };
 static const char* CW_NAMES_PTR[CHORD_COUNT] = {
     CW_NAMES_BUF[0], CW_NAMES_BUF[1], CW_NAMES_BUF[2],
@@ -470,14 +470,36 @@ static const char* NAMES_FM[CHORD_COUNT] = {
     "Daizy", "Fmaj7/13", "Em7", "C/E", "Dm7", "Dm6", "E7", "E", "Fmaj7"
 };
 
+// ---- Op — open / drone family (key of A major) ----------------------------
+// Built around ringing open E (6/1) and A (5) strings. Slots 1 and 2 are the
+// user-specified anchors (Asus2 @ 002452 and B/EA @ 004440). The remaining
+// slots fill out a diatonic I–ii–IV–V–vi set in A, picking voicings that
+// keep the same open-string character so everything blends together.
+//                                    6弦  5弦  4弦  3弦  2弦  1弦
+static const uint8_t CHORDS_OP[CHORD_COUNT][6] = {
+    {40, 45, 50, 55, 59, 64},  // 0 Daizy    E  A  D  G  B  E   open strings
+    {40, 45, 52, 59, 64, 66},  // 1 Asus2    0 0 2 4 5 2  = E A E B E F#
+    {40, 45, 54, 59, 63, 64},  // 2 B/EA     0 0 4 4 4 0  = E A F# B D# E
+    {40, 47, 54, 56, 59, 64},  // 3 E        0 2 2 1 0 0  = E B E G# B E
+    {42, 45, 52, 57, 59, 64},  // 4 F#m11    2 0 2 2 0 0  = F# A E A B E
+    { 0,  0, 50, 57, 62, 66},  // 5 D        x x 0 2 3 2  = D A D F#
+    { 0, 47, 54, 59, 62, 66},  // 6 Bm       x 2 4 4 3 2  = B F# B D F#
+    { 0, 45, 52, 56, 61, 64},  // 7 Amaj7    x 0 2 1 2 0  = A E G# C# E
+    {40, 45, 52, 57, 61, 64},  // 8 A        0 0 2 2 2 0  = E A E A C# E
+};
+static const char* NAMES_OP[CHORD_COUNT] = {
+    "Daizy", "Asus2", "B/EA", "E", "F#m11", "D", "Bm", "Amaj7", "A"
+};
+
 // Note: GROUPS is non-const so that the CW slot's offset can be updated at
-// runtime. Built-in groups (G1/Fm/GH) still point at const tables, so their
+// runtime. Built-in groups (G1/Fm/GH/Op) still point at const tables, so their
 // chord notes/names remain immutable.
 static Group GROUPS[] = {
     {"G1", CHORDS_STD, NAMES_STD,  0},
     {"Fm", CHORDS_FM,  NAMES_FM,   0},
     {"GH", CHORDS_GH,  NAMES_GH,   4},  // capo 4品
     {"CW", CW_CHORDS,  CW_NAMES_PTR, 4},  // 可由 SysEx 实时下发
+    {"Op", CHORDS_OP,  NAMES_OP,    0},  // 开放弦 drone 风格 (A 大调)
 };
 static const int GROUP_COUNT = sizeof(GROUPS) / sizeof(GROUPS[0]);
 
