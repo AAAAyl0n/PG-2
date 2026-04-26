@@ -424,6 +424,7 @@ struct Group
     const uint8_t     (*chords)[6];     // pointer to CHORD_COUNT × 6 table
     const char* const*  chordNames;
     int8_t              offset;          // semitone shift applied to non-muted notes
+    bool                fourWay;         // true = joystick uses 4 × 90° sectors (cardinals only)
 };
 
 // ---- "CW" — runtime user group, mutable via SysEx ---------------------------
@@ -491,15 +492,36 @@ static const char* NAMES_OP[CHORD_COUNT] = {
     "Daizy", "Asus2", "B/EA", "E", "F#m11", "D", "Bm", "Amaj7", "A"
 };
 
+// ---- Sp — four-direction special group (each sector = 90°) ----------------
+// Only the 4 cardinals are reachable (joystick zone detection switches to
+// 4-way when this group is active). Diagonal slots are filled with the open
+// voicing for safety, but are never selected at runtime.
+//                                    6弦  5弦  4弦  3弦  2弦  1弦
+static const uint8_t CHORDS_SP[CHORD_COUNT][6] = {
+    {40, 45, 50, 55, 59, 64},  // 0 Daizy    open strings
+    { 0, 48, 52, 55, 60, 64},  // 1 Up    C
+    {40, 45, 50, 55, 59, 64},  // 2 NE    (unused — open)
+    {43, 47, 50, 55, 59, 67},  // 3 Right G
+    {40, 45, 50, 55, 59, 64},  // 4 SE    (unused — open)
+    { 0, 45, 52, 57, 60, 64},  // 5 Down  Am
+    {40, 45, 50, 55, 59, 64},  // 6 SW    (unused — open)
+    {41, 48, 53, 57, 60, 65},  // 7 Left  F
+    {40, 45, 50, 55, 59, 64},  // 8 NW    (unused — open)
+};
+static const char* NAMES_SP[CHORD_COUNT] = {
+    "Daizy", "C", "", "G", "", "Am", "", "F", ""
+};
+
 // Note: GROUPS is non-const so that the CW slot's offset can be updated at
-// runtime. Built-in groups (G1/Fm/GH/Op) still point at const tables, so their
-// chord notes/names remain immutable.
+// runtime. Built-in groups (G1/Fm/GH/Op/Sp) still point at const tables, so
+// their chord notes/names remain immutable.
 static Group GROUPS[] = {
-    {"G1", CHORDS_STD, NAMES_STD,  0},
-    {"Fm", CHORDS_FM,  NAMES_FM,   0},
-    {"GH", CHORDS_GH,  NAMES_GH,   4},  // capo 4品
-    {"CW", CW_CHORDS,  CW_NAMES_PTR, 4},  // 可由 SysEx 实时下发
-    {"Op", CHORDS_OP,  NAMES_OP,    0},  // 开放弦 drone 风格 (A 大调)
+    {"G1", CHORDS_STD, NAMES_STD,    0, false},
+    {"Fm", CHORDS_FM,  NAMES_FM,     0, false},
+    {"GH", CHORDS_GH,  NAMES_GH,     4, false},  // capo 4品
+    {"CW", CW_CHORDS,  CW_NAMES_PTR, 4, false},  // 可由 SysEx 实时下发
+    {"Op", CHORDS_OP,  NAMES_OP,     0, false},  // 开放弦 drone 风格 (A 大调)
+    {"Sp", CHORDS_SP,  NAMES_SP,     0, true },  // 四向 90°: 上C 右G 下Am 左F
 };
 static const int GROUP_COUNT = sizeof(GROUPS) / sizeof(GROUPS[0]);
 
@@ -614,6 +636,8 @@ static const int JOYSTICK_DEADZONE = 400;
 // ---- Joystick zone detection ----
 // Returns 0=Center, 1=Up(C), 2=NE(Em), 3=Right(G), 4=SE(Dm),
 //         5=Down(Am), 6=SW(G7), 7=Left(F), 8=NW(E7)
+// When the current group is fourWay, only cardinals (0/1/3/5/7) are returned —
+// the joystick is divided into 4 × 90° sectors centered on Up/Right/Down/Left.
 int AppBangboo::_getJoystickZone()
 {
     int dx = HAL::GetJoystickX() - _data.centerX;
@@ -625,33 +649,23 @@ int AppBangboo::_getJoystickZone()
     float angle = atan2f((float)dx, (float)dy) * 180.0f / M_PI; // 0°=up, CW positive
     if (angle < 0) angle += 360.0f;
 
+    if (GROUPS[_data.groupIndex].fourWay) {
+        int sector4 = (int)((angle + 45.0f) / 90.0f) % 4;
+        static const int FOUR_WAY_MAP[4] = {1, 3, 5, 7}; // Up, Right, Down, Left
+        return FOUR_WAY_MAP[sector4];
+    }
+
     int sector = (int)((angle + 22.5f) / 45.0f) % 8;
     return sector + 1; // 1-8
 }
 
 // ---- Handle chord change ----
+// Chord change is passive: it only updates currentChord. Held or sustaining
+// strings keep playing their existing note until released — the new chord
+// takes effect on the next fresh touch. Matches real-guitar feel: you must
+// pluck again to hear the new chord.
 void AppBangboo::_onChordChange(uint8_t newChord)
 {
-    for (int i = 0; i < 6; i++) {
-        if (_data.activeNote[i] != 0 && _data.releaseTime[i] != 0) {
-            // Sustaining — let it keep ringing, don't touch it
-            continue;
-        }
-
-        if (_data.activeNote[i] != 0 && _data.stringTouched[i]) {
-            // String currently held — switch to new chord's note
-            sendNoteOff(_data.activeNote[i], 0, 0);
-            const Group& g = GROUPS[_data.groupIndex];
-            uint8_t baseNote = g.chords[newChord][i];
-            uint8_t newNote = (baseNote == 0) ? 0 : (uint8_t)(baseNote + g.offset);
-            if (newNote != 0) {
-                sendNoteOn(newNote, 127, 0);
-                _data.activeNote[i] = newNote;
-            } else {
-                _data.activeNote[i] = 0;
-            }
-        }
-    }
     _data.currentChord = newChord;
 }
 
@@ -934,30 +948,43 @@ void AppBangboo::_render()
         canvas->drawString(name, 120, 118);  // 17px above center
         canvas->setTextDatum(top_left);
 
-        // ---- Bottom strip: 8 chord names in 2×4 grid ----
-        // Row 1: NW, Up,   NE,   Right   (chord indices 8, 1, 2, 3)
-        // Row 2: Left, SW, Down, SE      (chord indices 7, 6, 5, 4)
-        static const uint8_t STRIP_LAYOUT[2][4] = {
-            {8, 1, 2, 3},
-            {7, 6, 5, 4},
-        };
+        // ---- Bottom strip: 8 chord names in 3-2-3 diamond layout ----
+        // Top row    : NW(8)  Up(1)   NE(2)   — 3 centered
+        // Middle row : Left(7)              Right(3)  — sides only
+        // Bottom row : SW(6)  Down(5) SE(4)  — 3 centered
+        // Top/bottom row Y match the original 2-row strip; middle row sits
+        // between them at the vertical midpoint.
         canvas->setFont(&fonts::Font0);
         canvas->setTextSize(1);
-        const int slotW  = 240 / 4;          // 60 px
-        const int rowY[2] = {214, 226};
-        for (int row = 0; row < 2; row++) {
-            for (int col = 0; col < 4; col++) {
-                uint8_t idx = STRIP_LAYOUT[row][col];
-                const char* nm = g.chordNames[idx];
-                int len = strlen(nm);
-                int cx  = col * slotW + slotW / 2;
-                int tx  = cx - len * 3;
-                bool sel = (idx == _data.currentChord);
-                canvas->setTextColor(sel ? TFT_LIGHTGREY : TFT_DARKGREY);
-                canvas->setCursor(tx, rowY[row]);
-                canvas->print(nm);
-            }
-        }
+
+        auto drawName = [&](uint8_t idx, int cx, int y) {
+            const char* nm = g.chordNames[idx];
+            int len = strlen(nm);
+            int tx  = cx - len * 3;
+            bool sel = (idx == _data.currentChord);
+            canvas->setTextColor(sel ? TFT_LIGHTGREY : TFT_DARKGREY);
+            canvas->setCursor(tx, y);
+            canvas->print(nm);
+        };
+
+        const int topY = 214;
+        const int botY = 226;
+        const int midY = (topY + botY) / 2;
+        const int triCx[3] = {60, 120, 180};   // 3-column centered
+        const int sideLeftCx  = 18;
+        const int sideRightCx = 222;
+
+        // Top row
+        drawName(8, triCx[0], topY);
+        drawName(1, triCx[1], topY);
+        drawName(2, triCx[2], topY);
+        // Middle row (sides only)
+        drawName(7, sideLeftCx,  midY);
+        drawName(3, sideRightCx, midY);
+        // Bottom row
+        drawName(6, triCx[0], botY);
+        drawName(5, triCx[1], botY);
+        drawName(4, triCx[2], botY);
     }
 
     // Group-name dropdown bubble (drawn last so it overlays everything)
